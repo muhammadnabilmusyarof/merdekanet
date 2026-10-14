@@ -18,7 +18,7 @@ import {
   Compass
 } from 'lucide-react';
 import { sound } from '../lib/audio';
-import { broadcastSpinCommand, subscribeSpinCommands } from '../lib/spinSync';
+import { broadcastSpinCommand, subscribeSpinCommands, subscribeRealtimeStatus } from '../lib/spinSync';
 
 // Curated Vibrant Official Festival Wheel Sector Palette (Trustworthy, corporate festival, clean)
 const SLICE_COLORS = [
@@ -49,6 +49,7 @@ export default function LiveStage({
   const [winnerTicket, setWinnerTicket] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [realtimeStatus, setRealtimeStatus] = useState('CONNECTING');
   // Tampilan 360° penuh saat standby & berputar, otomatis Zoom Makro di sekitar jarum saat KUNCI ditekan
   const isZoomed = isStopping || Boolean(winnerTicket);
   const isZoomedRef = useRef(isZoomed);
@@ -944,30 +945,51 @@ export default function LiveStage({
     state.status = 'decelerating';
   }, [eligibleTickets]);
 
+  // Keep references to latest handlers and props
+  const handlersRef = useRef({});
+  handlersRef.current = {
+    startSpinWheel,
+    stopSpinWheel,
+    prizes,
+    selectedPrize,
+    setSelectedPrize,
+    winnerTicket,
+    onMarkWinner,
+  };
+
+  // Subscribe to realtime status
+  useEffect(() => {
+    const unsubStatus = subscribeRealtimeStatus((status) => {
+      setRealtimeStatus(status);
+    });
+    return () => unsubStatus();
+  }, []);
+
   // Realtime cross-tab & remote subscription: listens to Admin commands
   useEffect(() => {
     const unsubscribe = subscribeSpinCommands((cmd) => {
+      const h = handlersRef.current;
       if (cmd.type === 'START_SPIN') {
-        startSpinWheel(cmd.prizeId);
+        h.startSpinWheel?.(cmd.prizeId);
       } else if (cmd.type === 'STOP_SPIN') {
-        stopSpinWheel(cmd.winnerId);
+        h.stopSpinWheel?.(cmd.winnerId);
       } else if (cmd.type === 'CONFIRM_WINNER') {
-        if (winnerTicket) {
-          onMarkWinner(winnerTicket, selectedPrize.name);
-          setWinnerTicket(null);
+        if (h.winnerTicket && h.onMarkWinner) {
+          h.onMarkWinner(h.winnerTicket, h.selectedPrize?.name);
         }
+        setWinnerTicket(null);
       } else if (cmd.type === 'CANCEL_WINNER') {
         setWinnerTicket(null);
       } else if (cmd.type === 'SELECT_PRIZE') {
-        if (cmd.prizeId && prizes) {
-          const found = prizes.find((p) => p.id === cmd.prizeId);
-          if (found) setSelectedPrize(found);
+        if (cmd.prizeId && h.prizes && h.setSelectedPrize) {
+          const found = h.prizes.find((p) => p.id === cmd.prizeId);
+          if (found) h.setSelectedPrize(found);
         }
       }
     });
 
     return () => unsubscribe();
-  }, [startSpinWheel, stopSpinWheel, prizes, setSelectedPrize, winnerTicket, onMarkWinner, selectedPrize]);
+  }, []); // Run ONCE on mount so subscription is never interrupted!
 
   // Local Admin Start Handler
   const handleStartSpin = () => {
@@ -1086,6 +1108,13 @@ export default function LiveStage({
             <Users className="w-3.5 h-3.5 text-amber-400" />
             <span>Kupon Siap Diundi:</span>
             <strong className="text-amber-300 font-mono font-bold">{eligibleTickets.length.toLocaleString('id-ID')}</strong>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-800 px-2.5 py-1.5 rounded-full text-[11px] text-slate-300">
+            <span className={`w-2 h-2 rounded-full ${realtimeStatus === 'SUBSCRIBED' ? 'bg-emerald-400 animate-pulse' : realtimeStatus === 'CONNECTING' ? 'bg-amber-400' : 'bg-rose-400'}`}></span>
+            <span className="text-[10px] font-bold text-slate-300">
+              {realtimeStatus === 'SUBSCRIBED' ? 'Remote Sync Aktif' : 'Menghubungkan...'}
+            </span>
           </div>
         </div>
 

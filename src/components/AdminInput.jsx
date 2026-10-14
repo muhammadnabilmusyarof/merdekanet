@@ -19,7 +19,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { sound } from '../lib/audio';
-import { broadcastSpinCommand, subscribeSpinCommands } from '../lib/spinSync';
+import { broadcastSpinCommand, subscribeSpinCommands, subscribeRealtimeStatus } from '../lib/spinSync';
 
 function getNextTicketNumber(ticketList) {
   let maxNum = 0;
@@ -58,6 +58,7 @@ export default function AdminInput({
   const [isRolling, setIsRolling] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [lockedWinner, setLockedWinner] = useState(null);
+  const [realtimeStatus, setRealtimeStatus] = useState('CONNECTING');
 
   // Eligible tickets for drawing
   const eligibleTickets = tickets.filter((t) => t.status === 'eligible');
@@ -67,20 +68,33 @@ export default function AdminInput({
     return tickets.filter((t) => t.status === 'won' && t.prize_won === prizeName).length;
   };
 
+  // Keep references to latest props to prevent subscription re-creations
+  const propsRef = React.useRef({ tickets, prizes, setSelectedPrize });
+  propsRef.current = { tickets, prizes, setSelectedPrize };
+
+  // Subscribe to realtime status
+  useEffect(() => {
+    const unsubStatus = subscribeRealtimeStatus((status) => {
+      setRealtimeStatus(status);
+    });
+    return () => unsubStatus();
+  }, []);
+
   // Realtime subscription in Admin to stay in sync with public wheel and commands
   useEffect(() => {
     const unsubscribe = subscribeSpinCommands((cmd) => {
+      const p = propsRef.current;
       if (cmd.type === 'START_SPIN') {
         setIsRolling(true);
         setIsStopping(false);
         setLockedWinner(null);
-        if (cmd.prizeId && prizes && setSelectedPrize) {
-          const found = prizes.find((p) => p.id === cmd.prizeId);
-          if (found) setSelectedPrize(found);
+        if (cmd.prizeId && p.prizes && p.setSelectedPrize) {
+          const found = p.prizes.find((pz) => pz.id === cmd.prizeId);
+          if (found) p.setSelectedPrize(found);
         }
       } else if (cmd.type === 'STOP_SPIN') {
         setIsStopping(true);
-        const wTicket = tickets.find((t) => t.id === cmd.winnerId);
+        const wTicket = p.tickets?.find((t) => t.id === cmd.winnerId);
         // Sync when deceleration completes on screen (~6.5s)
         setTimeout(() => {
           setIsRolling(false);
@@ -94,15 +108,15 @@ export default function AdminInput({
         setIsStopping(false);
         setLockedWinner(null);
       } else if (cmd.type === 'SELECT_PRIZE') {
-        if (cmd.prizeId && prizes && setSelectedPrize) {
-          const found = prizes.find((p) => p.id === cmd.prizeId);
-          if (found) setSelectedPrize(found);
+        if (cmd.prizeId && p.prizes && p.setSelectedPrize) {
+          const found = p.prizes.find((pz) => pz.id === cmd.prizeId);
+          if (found) p.setSelectedPrize(found);
         }
       }
     });
 
     return () => unsubscribe();
-  }, [prizes, setSelectedPrize, tickets]);
+  }, []); // Run once on mount!
 
   // Admin Start Spin Handler
   const handleAdminStartSpin = () => {
@@ -329,13 +343,25 @@ export default function AdminInput({
                 <h3 className="text-base sm:text-lg font-black text-white">
                   KONTROL PUTAR RODA UNDIAN (LIVE ADMIN)
                 </h3>
-                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Realtime Terhubung
-                </span>
+                {realtimeStatus === 'SUBSCRIBED' ? (
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Realtime Online (Laptop ↔ HP Terhubung)
+                  </span>
+                ) : realtimeStatus === 'CONNECTING' ? (
+                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-spin"></span>
+                    Menghubungkan Server Realtime...
+                  </span>
+                ) : (
+                  <span className="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                    Mencoba Sambung Ulang...
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Tombol putar dan kunci nomor di layar publik OBS/proyektor dikendalikan langsung dari panel ini.
+                Tombol putar dan kunci nomor di layar publik OBS/HP dikendalikan langsung dari panel ini.
               </p>
             </div>
           </div>
