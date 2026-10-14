@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  h1, h2, h3, .font-heading {
+    font-family: 'Outfit', sans-serif;
+  }
+  .font-mono-num {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* 3D Cylindrical Drum Inner Shadow */
+.slot-drum-shadow {
+  box-shadow: inset 0 30px 25px -12px rgba(0, 0, 0, 0.95), inset 0 -30px 25px -12px rgba(0, 0, 0, 0.95);
+}
+
+/* CONTINUOUS BUTTERY SLOT WATERFALL SPINS */
+@keyframes slot-infinite-spin {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-700px); }
+}
+
+.slot-spin-reel-1 {
+  animation: slot-infinite-spin 0.36s linear infinite;
+  will-change: transform;
+}
+
+.slot-spin-reel-2 {
+  animation: slot-infinite-spin 0.28s linear infinite;
+  will-change: transform;
+}
+
+.slot-spin-reel-3 {
+  animation: slot-infinite-spin 0.32s linear infinite;
+  will-change: transform;
+}
+
+/* Casino Bulb Chaser Lights */
+@keyframes bulb-chase-1 {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 8px #f59e0b); }
+  50% { opacity: 0.25; filter: none; }
+}
+
+@keyframes bulb-chase-2 {
+  0%, 100% { opacity: 0.25; filter: none; }
+  50% { opacity: 1; filter: drop-shadow(0 0 8px #ef4444); }
+}
+
+.animate-bulb-1 {
+  animation: bulb-chase-1 0.7s infinite;
+}
+.animate-bulb-2 {
+  animation: bulb-chase-2 0.7s infinite;
+}
+
+/* Shimmer metallic foil reflection */
+@keyframes metallic-shimmer {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  100% { transform: translateX(250%) skewX(-20deg); }
+}
+
+.shimmer-foil::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 100%
+  );
+  animation: metallic-shimmer 2.5s infinite ease-in-out;
+  pointer-events: none;
+}
+
+/* Spotlight sweeping */
+@keyframes spotlight-sweep {
+  0%, 100% { transform: rotate(-25deg) scale(1); opacity: 0.25; }
+  50% { transform: rotate(25deg) scale(1.1); opacity: 0.5; }
+}
+
+.animate-spotlight-left {
+  animation: spotlight-sweep 5s ease-in-out infinite alternate;
+}
+.animate-spotlight-right {
+  animation: spotlight-sweep 5s ease-in-out infinite alternate-reverse;
+}
+
+/* Payline Laser Glow */
+@keyframes payline-glow {
+  0%, 100% { opacity: 0.9; box-shadow: 0 0 15px rgba(245, 158, 11, 0.5); }
+  50% { opacity: 1; box-shadow: 0 0 25px rgba(239, 68, 68, 0.7); }
+}
+
+.animate-payline-glow {
+  animation: payline-glow 1.2s ease-in-out infinite;
+}
