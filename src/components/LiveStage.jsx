@@ -1363,24 +1363,31 @@ export default function LiveStage({
               </p>
             </div>
 
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={handleConfirmWinner}
-                className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg"
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>KUNCI & SIMPAN PEMENANG</span>
-              </button>
+            {/* Actions: Hanya muncul di mode Admin, di layar Publik hanya menampilkan pengumuman resmi */}
+            {isAdmin ? (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={handleConfirmWinner}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>KUNCI & SIMPAN PEMENANG</span>
+                </button>
 
-              <button
-                onClick={handleCancelWinner}
-                className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>Undi Ulang</span>
-              </button>
-            </div>
+                <button
+                  onClick={handleCancelWinner}
+                  className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Undi Ulang</span>
+                </button>
+              </div>
+            ) : (
+              <div className="py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-emerald-950/60 border border-emerald-500/30 flex items-center justify-center gap-2 text-emerald-300 text-xs sm:text-sm font-bold shadow-inner">
+                <Sparkles className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
+                <span>Selamat kepada Pemenang! Menunggu konfirmasi sah panitia...</span>
+              </div>
+            )}
           </div>
         </div>
       )}
