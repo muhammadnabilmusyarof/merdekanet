@@ -88,23 +88,30 @@ export function initSupabaseChannel() {
 
   try {
     notifyStatus('CONNECTING');
+
+    // IMPORTANT: private: false → public channel, no RLS check needed.
+    // ack: true  → server confirms receipt (not delivery to other devices).
+    // self: true → sender also receives own message (for local consistency).
     supabaseChannel = supabase.channel(CHANNEL_TOPIC, {
       config: {
+        private: false,
         broadcast: {
-          ack: true,
-          self: true, // Receive own broadcasts for complete state consistency
+          ack: false,  // ack:true only confirms server got it, not cross-device delivery
+          self: false, // local dispatch already handles sender, avoid double-fire
         },
       },
     });
 
     supabaseChannel
       .on('broadcast', { event: 'spin_command' }, ({ payload }) => {
+        console.log('[Supabase] Received spin_command:', payload?.type);
         dispatchCommand(payload);
       })
       .subscribe((status, error) => {
         if (error) {
           console.warn('[Supabase Realtime Channel Error]:', error);
         }
+        console.log('[Supabase] Channel status:', status);
         notifyStatus(status);
 
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -144,10 +151,10 @@ export async function broadcastSpinCommand(command) {
     timestamp: Date.now(),
   };
 
-  // 1. Dispatch locally to current window
+  // 1. Dispatch locally to current window (same tab)
   dispatchCommand(payload);
 
-  // 2. BroadcastChannel (0ms latency local cross-tab)
+  // 2. BroadcastChannel (0ms latency, same-origin cross-tab on same device)
   if (broadcastChannel) {
     try {
       broadcastChannel.postMessage(payload);
@@ -156,40 +163,44 @@ export async function broadcastSpinCommand(command) {
     }
   }
 
-  // 3. LocalStorage Event (Fallback for local windows)
+  // 3. LocalStorage Event (fallback for same-origin cross-window on same device)
   try {
     localStorage.setItem(STORAGE_EVENT_KEY, JSON.stringify(payload));
   } catch (e) {
     console.warn('LocalStorage sync error:', e);
   }
 
-  // 4. Supabase Realtime Broadcast (Cross-device, e.g. Laptop Admin -> Mobile OBS)
+  // 4. Supabase Realtime Broadcast (cross-device: Admin laptop → Live screen / mobile)
   if (isSupabaseConfigured && supabase) {
     const channel = initSupabaseChannel();
     if (channel) {
-      // If channel is still connecting, await up to 2.5 seconds
+      // Wait up to 5s for channel to be SUBSCRIBED before sending
       if (channelStatus !== 'SUBSCRIBED') {
         await new Promise((resolve) => {
-          const timeout = setTimeout(resolve, 2500);
-          const interval = setInterval(() => {
-            if (channelStatus === 'SUBSCRIBED') {
+          const timeout = setTimeout(resolve, 5000);
+          const unwatch = subscribeRealtimeStatus((s) => {
+            if (s === 'SUBSCRIBED') {
               clearTimeout(timeout);
-              clearInterval(interval);
+              unwatch();
               resolve();
             }
-          }, 50);
+          });
         });
       }
 
-      try {
-        const sendResult = await channel.send({
-          type: 'broadcast',
-          event: 'spin_command',
-          payload,
-        });
-        console.log('[Supabase Broadcast Delivered]:', sendResult, payload.type);
-      } catch (e) {
-        console.warn('Supabase broadcast error:', e);
+      if (channelStatus === 'SUBSCRIBED') {
+        try {
+          const sendResult = await channel.send({
+            type: 'broadcast',
+            event: 'spin_command',
+            payload,
+          });
+          console.log('[Supabase Broadcast Sent]:', sendResult, payload.type, payload._id);
+        } catch (e) {
+          console.warn('Supabase broadcast error:', e);
+        }
+      } else {
+        console.warn('[Supabase] Channel not SUBSCRIBED after wait, command may not reach other devices:', payload.type);
       }
     }
   }
