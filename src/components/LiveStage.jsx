@@ -1006,30 +1006,34 @@ export default function LiveStage({
       if (!confirmExceed) return;
     }
 
+    // broadcastSpinCommand already calls dispatchCommand locally (which triggers startSpinWheel
+    // via the subscribeSpinCommands listener). Do NOT call startSpinWheel again here — that
+    // would double-trigger physics and break cross-device consistency.
     broadcastSpinCommand({ type: 'START_SPIN', prizeId: selectedPrize.id });
-    startSpinWheel(selectedPrize.id);
   };
 
   // Local Admin Stop Handler
   const handleStopSpin = () => {
     if (!isRolling || isStopping) return;
+    // Pick winner ONCE here, then broadcast that exact winnerId so every device
+    // (admin + live screens) all decelerate to the same ticket.
     const chosenWinner = eligibleTickets[Math.floor(Math.random() * eligibleTickets.length)];
+    // broadcastSpinCommand dispatches locally first, so stopSpinWheel is called
+    // via the subscribeSpinCommands listener — no need to call it again manually.
     broadcastSpinCommand({ type: 'STOP_SPIN', winnerId: chosenWinner?.id });
-    stopSpinWheel(chosenWinner?.id);
   };
 
-  // Confirm winner
+  // Confirm winner — broadcastSpinCommand dispatches locally first so the
+  // CONFIRM_WINNER listener (subscribeSpinCommands) handles onMarkWinner +
+  // setWinnerTicket(null) for all devices including admin. No manual call needed.
   const handleConfirmWinner = () => {
     if (!winnerTicket) return;
     broadcastSpinCommand({ type: 'CONFIRM_WINNER', winnerId: winnerTicket.id, prizeName: selectedPrize.name });
-    onMarkWinner(winnerTicket, selectedPrize.name);
-    setWinnerTicket(null);
   };
 
-  // Cancel/Re-roll winner
+  // Cancel/Re-roll winner — same pattern, local dispatch handles setWinnerTicket(null)
   const handleCancelWinner = () => {
     broadcastSpinCommand({ type: 'CANCEL_WINNER' });
-    setWinnerTicket(null);
   };
 
   // Toggle Fullscreen OBS Mode
